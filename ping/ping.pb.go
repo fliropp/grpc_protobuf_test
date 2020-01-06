@@ -110,15 +110,16 @@ func init() {
 func init() { proto.RegisterFile("ping.proto", fileDescriptor_6d51d96c3ad891f5) }
 
 var fileDescriptor_6d51d96c3ad891f5 = []byte{
-	// 128 bytes of a gzipped FileDescriptorProto
+	// 143 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0xe2, 0x2a, 0xc8, 0xcc, 0x4b,
 	0xd7, 0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0x62, 0x01, 0xb1, 0x95, 0x94, 0xb9, 0xd8, 0x03, 0x32,
 	0xf3, 0xd2, 0x83, 0x52, 0x0b, 0x85, 0x24, 0xb8, 0xd8, 0x8b, 0x52, 0x0b, 0x4b, 0x53, 0x8b, 0x4b,
 	0x24, 0x18, 0x15, 0x18, 0x35, 0x38, 0x83, 0x60, 0x5c, 0x25, 0x35, 0x2e, 0x0e, 0x88, 0xa2, 0xe2,
 	0x02, 0x21, 0x29, 0x2e, 0x8e, 0xa2, 0xd4, 0xe2, 0x82, 0xfc, 0xbc, 0xe2, 0x54, 0xa8, 0x32, 0x38,
-	0xdf, 0xc8, 0x88, 0x8b, 0x05, 0xa4, 0x4e, 0x48, 0x8b, 0x8b, 0xdd, 0x3d, 0xb5, 0x04, 0xcc, 0xe4,
-	0xd5, 0x03, 0x5b, 0x09, 0xb5, 0x43, 0x8a, 0x0f, 0x99, 0x5b, 0x5c, 0xa0, 0xc4, 0x90, 0xc4, 0x06,
-	0x76, 0x8d, 0x31, 0x20, 0x00, 0x00, 0xff, 0xff, 0x04, 0x39, 0x9e, 0xbf, 0x9b, 0x00, 0x00, 0x00,
+	0xdf, 0x28, 0x99, 0x8b, 0x05, 0xa4, 0x4e, 0x48, 0x8b, 0x8b, 0xdd, 0x3d, 0xb5, 0x04, 0xcc, 0xe4,
+	0xd5, 0x03, 0x5b, 0x09, 0xb5, 0x43, 0x8a, 0x0f, 0x99, 0x5b, 0x5c, 0xa0, 0xc4, 0x20, 0xa4, 0xcf,
+	0xc5, 0x15, 0x5c, 0x52, 0x94, 0x9a, 0x98, 0x4b, 0x94, 0x72, 0x03, 0xc6, 0x24, 0x36, 0xb0, 0xf3,
+	0x8d, 0x01, 0x01, 0x00, 0x00, 0xff, 0xff, 0xfa, 0x89, 0x1c, 0xdf, 0xcc, 0x00, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -134,6 +135,7 @@ const _ = grpc.SupportPackageIsVersion4
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
 type PingClient interface {
 	GetPing(ctx context.Context, in *PingReq, opts ...grpc.CallOption) (*PingResp, error)
+	StreamPing(ctx context.Context, in *PingReq, opts ...grpc.CallOption) (Ping_StreamPingClient, error)
 }
 
 type pingClient struct {
@@ -153,9 +155,42 @@ func (c *pingClient) GetPing(ctx context.Context, in *PingReq, opts ...grpc.Call
 	return out, nil
 }
 
+func (c *pingClient) StreamPing(ctx context.Context, in *PingReq, opts ...grpc.CallOption) (Ping_StreamPingClient, error) {
+	stream, err := c.cc.NewStream(ctx, &_Ping_serviceDesc.Streams[0], "/ping.Ping/StreamPing", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &pingStreamPingClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type Ping_StreamPingClient interface {
+	Recv() (*PingResp, error)
+	grpc.ClientStream
+}
+
+type pingStreamPingClient struct {
+	grpc.ClientStream
+}
+
+func (x *pingStreamPingClient) Recv() (*PingResp, error) {
+	m := new(PingResp)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // PingServer is the server API for Ping service.
 type PingServer interface {
 	GetPing(context.Context, *PingReq) (*PingResp, error)
+	StreamPing(*PingReq, Ping_StreamPingServer) error
 }
 
 // UnimplementedPingServer can be embedded to have forward compatible implementations.
@@ -164,6 +199,9 @@ type UnimplementedPingServer struct {
 
 func (*UnimplementedPingServer) GetPing(ctx context.Context, req *PingReq) (*PingResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetPing not implemented")
+}
+func (*UnimplementedPingServer) StreamPing(req *PingReq, srv Ping_StreamPingServer) error {
+	return status.Errorf(codes.Unimplemented, "method StreamPing not implemented")
 }
 
 func RegisterPingServer(s *grpc.Server, srv PingServer) {
@@ -188,6 +226,27 @@ func _Ping_GetPing_Handler(srv interface{}, ctx context.Context, dec func(interf
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Ping_StreamPing_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(PingReq)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(PingServer).StreamPing(m, &pingStreamPingServer{stream})
+}
+
+type Ping_StreamPingServer interface {
+	Send(*PingResp) error
+	grpc.ServerStream
+}
+
+type pingStreamPingServer struct {
+	grpc.ServerStream
+}
+
+func (x *pingStreamPingServer) Send(m *PingResp) error {
+	return x.ServerStream.SendMsg(m)
+}
+
 var _Ping_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "ping.Ping",
 	HandlerType: (*PingServer)(nil),
@@ -197,6 +256,12 @@ var _Ping_serviceDesc = grpc.ServiceDesc{
 			Handler:    _Ping_GetPing_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "StreamPing",
+			Handler:       _Ping_StreamPing_Handler,
+			ServerStreams: true,
+		},
+	},
 	Metadata: "ping.proto",
 }

@@ -4,7 +4,9 @@ package ping;
 
 service Ping {
   rpc GetPing(PingReq) returns (PingResp) {}
+  rpc StreamPing(PingReq) returns (stream PingResp) {}
 }
+
 message PingReq {
    string request = 1;
 
