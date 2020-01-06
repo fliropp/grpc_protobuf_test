@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"time"
 
@@ -20,8 +21,28 @@ var (
 	serverHostOverride = flag.String("server_host_override", "x.test.youtube.com", "The server name use to verify the hostname returned by TLS handshake")
 )
 
-func printPing(client ping.PingClient, p *ping.PingReq) {
+func streamPings(client ping.PingClient, p *ping.PingReq) {
 	log.Printf("Sedning msg ovre gRPC (%s)", p)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	stream, err := client.StreamPing(ctx, p)
+	if err != nil {
+		log.Fatalf("%v.GetPingReq(_) = _, %v: ", client, err)
+	}
+	for {
+		png, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			log.Fatalf("%v.StreamPings(_) = _, %v", client, err)
+		}
+		log.Println(png)
+	}
+}
+
+func getSinglePing(client ping.PingClient, p *ping.PingReq) {
+	log.Printf("Getting single ping over gRPC (%s)", p)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	png, err := client.GetPing(ctx, p)
@@ -56,7 +77,8 @@ func main() {
 	defer conn.Close()
 	client := ping.NewPingClient(conn)
 
-	// Looking for a valid feature
-	printPing(client, &ping.PingReq{Request: "ping"})
+	getSinglePing(client, &ping.PingReq{Request: "ping"})
+	fmt.Println("-----------")
+	streamPings(client, &ping.PingReq{Request: "pings"})
 
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"time"
 
 	ping "github.com/fliropp/grpc_protobuf_test/ping"
 	"google.golang.org/grpc"
@@ -29,19 +30,20 @@ func (ps *pingServer) GetPing(ctx context.Context, p *ping.PingReq) (*ping.PingR
 	return &ping.PingResp{Response: "pong"}, nil
 }
 
-func (s *pingServer) ListFeatures(p *ping.PingReq, stream ping.Ping_StreamPingServer) error {
+func (s *pingServer) StreamPing(p *ping.PingReq, stream ping.Ping_StreamPingServer) error {
 	pings := [5]string{"ping1", "ping2", "ping3", "ping4", "ping5"}
 	for _, p := range pings {
 		err := stream.Send(&ping.PingResp{Response: p})
 		if err != nil {
 			return err
 		}
+		time.Sleep(2 * time.Second)
 	}
 	return nil
 }
 
-func newServer() *pingServer {
-	s := &pingServer{msg: "ping"}
+func newServer() ping.PingServer {
+	s := &pingServer{msg: "pang"}
 	return s
 }
 
